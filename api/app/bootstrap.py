@@ -10,7 +10,7 @@ from wss_common.db import Base, SessionLocal, engine
 from wss_common.enums import UserRole
 from wss_common.models import User
 
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -38,5 +38,25 @@ def bootstrap() -> None:
             db.add(admin)
             db.commit()
             logger.info("Bootstrap admin user created.")
+        elif settings.bootstrap_admin_force_reset:
+            admin = (
+                db.query(User)
+                .filter(User.username == settings.bootstrap_admin_username)
+                .first()
+            )
+            if admin is None:
+                logger.warning(
+                    "BOOTSTRAP_ADMIN_FORCE_RESET is set but user %r does not exist.",
+                    settings.bootstrap_admin_username,
+                )
+            elif verify_password(settings.bootstrap_admin_password, admin.password_hash):
+                logger.info("Bootstrap admin password already matches; nothing to reset.")
+            else:
+                admin.password_hash = get_password_hash(settings.bootstrap_admin_password)
+                db.commit()
+                logger.info(
+                    "Bootstrap admin %r password reset from BOOTSTRAP_ADMIN_PASSWORD.",
+                    settings.bootstrap_admin_username,
+                )
     finally:
         db.close()

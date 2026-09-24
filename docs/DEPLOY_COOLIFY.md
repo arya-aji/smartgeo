@@ -305,6 +305,14 @@ Use capacity `100G` (not `1`). Also change `rpc_secret` and `admin_token` in
 `NEXT_PUBLIC_API_BASE_URL` is baked in at build time. Fix the env var and
 redeploy **with rebuild**.
 
+**Locked out of the admin account (401 on login)**
+The bootstrap admin is created only while the `users` table is empty
+(`api/app/bootstrap.py`), so changing `BOOTSTRAP_ADMIN_PASSWORD` after the first
+start does **not** update an existing admin. Recover without database access:
+set `BOOTSTRAP_ADMIN_PASSWORD` to the password you want and
+`BOOTSTRAP_ADMIN_FORCE_RESET=true` in Coolify, redeploy the `api` service, log
+in, then set `BOOTSTRAP_ADMIN_FORCE_RESET=false` again.
+
 **Workers idle, jobs stuck in `QUEUED`**
 Check the `cv-worker` logs. The worker consumes from the Redis list
 `wss:cv:jobs`; if it crashed on startup it restarts, and a `nack`ed job returns

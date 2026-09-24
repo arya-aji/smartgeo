@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     bootstrap_admin_username: str = "admin"
     bootstrap_admin_password: str = "admin123"
     bootstrap_admin_name: str = "Administrator"
+    # When true, an existing bootstrap admin's password is reset to
+    # `bootstrap_admin_password` on startup. Recovery path for a lost/changed
+    # admin password when there is no database access; keep false normally.
+    bootstrap_admin_force_reset: bool = False
 
     # --- Upload validation ---
     upload_max_bytes: int = 52_428_800
