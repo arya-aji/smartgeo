@@ -33,6 +33,9 @@ yarn-error.log*
 
 # --- Data / runtime ---
 data/
+# The API ships a packaged master idsubsls list (api/app/data/idsubsls.txt) that
+# must be committed; re-include that directory.
+!api/app/data/
 storage/
 tmp/
 *.log

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from app.bootstrap import bootstrap
+from app.bootstrap import bootstrap, seed_master_targets
 from app.core.security import get_password_hash, verify_password
 from wss_common.config import settings
-from wss_common.models import User
+from wss_common.models import User, WssTarget
 
 
 def _get_admin(db_session) -> User:
@@ -61,3 +61,22 @@ def test_bootstrap_without_force_reset_keeps_password(db_session):
     # Restore the shared admin for any later tests.
     admin.password_hash = get_password_hash(settings.bootstrap_admin_password)
     db_session.commit()
+
+
+def test_seed_master_targets_adds_missing_and_is_idempotent(db_session):
+    before = db_session.query(WssTarget).count()
+
+    added = seed_master_targets(db_session)
+    assert added > 0
+    assert db_session.query(WssTarget).count() == before + added
+
+    # A known code from the packaged master list must now exist.
+    assert (
+        db_session.query(WssTarget)
+        .filter(WssTarget.idsubsls == "3173010001000101")
+        .first()
+        is not None
+    )
+
+    # Running again is a no-op.
+    assert seed_master_targets(db_session) == 0

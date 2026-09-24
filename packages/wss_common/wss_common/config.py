@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     # `bootstrap_admin_password` on startup. Recovery path for a lost/changed
     # admin password when there is no database access; keep false normally.
     bootstrap_admin_force_reset: bool = False
+    # Seed `wss_targets` from the packaged master idsubsls list on API startup
+    # (see api/app/data/idsubsls.txt). Idempotent: only missing rows are added.
+    seed_master_targets: bool = True
 
     # --- Upload validation ---
     upload_max_bytes: int = 52_428_800

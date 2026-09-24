@@ -218,11 +218,15 @@ curl https://api.maps.example.com/api/health
 ## 6. Verify end to end
 
 1. Open `https://maps.example.com` and log in with the bootstrap admin.
-2. Go to **Upload**, drag in a map photo.
-3. Watch it move `QUEUED → DETECTING_PAPER → … → COMPLETED / NEEDS_REVIEW`.
-4. Import the master list on **Targets** (one `idsubsls` per line) so valid IDs
-   can auto-accept instead of always going to review.
-5. Check **Dashboard** for totals and progress.
+2. The master region list (5,511 `idsubsls`) is seeded automatically into
+   `wss_targets` on the first API start from `api/app/data/idsubsls.txt`
+   (disable with `SEED_MASTER_TARGETS=false`). Confirm it on the **Map** page.
+3. Go to **Upload**, drag in a map photo.
+4. Watch it move `QUEUED → DETECTING_PAPER → … → COMPLETED / NEEDS_REVIEW`.
+5. On **Map**, locate the region: once processing completes, that `idsubsls` row
+   shows its state with **Preview** and **Download** buttons (the worker links
+   the map to the region by `idsubsls`).
+6. Check **Dashboard** for totals and progress.
 
 If the browser upload fails, see *Troubleshooting*.
 
