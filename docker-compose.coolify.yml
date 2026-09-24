@@ -1,0 +1,187 @@
+# =============================================================================
+# WSS Map Processing Platform — Coolify production stack
+#
+# Differences from the local docker-compose.yml:
+#   * No host `ports:` for databases/workers — everything is reached through
+#     Coolify's Traefik proxy (only `web`, `api` and `garage-cors` are exposed).
+#   * Explicit `environment:` blocks instead of `env_file`, so Coolify's env
+#     vars are injected per service (Coolify-friendly).
+#   * No host `ports:` and no manual Traefik labels — Coolify injects the routing
+#     labels automatically once you assign a domain to a service in the UI.
+#
+# In Coolify: New Resource -> Docker Compose -> set "Docker Compose Location"
+# to /docker-compose.coolify.yml, then set the domains and env vars in the UI.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-wss}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-wss} -d $${POSTGRES_DB:-wss}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  garage:
+    image: dxflrs/garage:v2.1.0
+    restart: unless-stopped
+    volumes:
+      - ./infra/garage/garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    expose:
+      - "3900"
+    healthcheck:
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  # Browser-facing S3 endpoint. Garage's built-in CORS only decorates OPTIONS
+  # with a 403 (which fails the browser preflight), so Caddy terminates the
+  # preflight and proxies requests unchanged. Do NOT add `header_up Host` to the
+  # Caddyfile — rewriting the Host breaks the SigV4 signature.
+  garage-cors:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    expose:
+      - "3900"
+    # Routing: in normal mode Coolify injects the Traefik labels automatically
+    # once you assign a domain to this service in the UI (Component Settings ->
+    # Domains). Do NOT add manual Traefik labels here — duplicate routers on the
+    # same Host can conflict. Manual labels are only needed in "Raw Compose
+    # Deployment" mode (see docs/DEPLOY_COOLIFY.md, section 2).
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    environment: &app_env
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-wss}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wss}
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://garage:3900
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      S3_REGION: ${S3_REGION:-garage}
+      S3_BUCKET: ${S3_BUCKET:-wss}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_ACCESS_KEY_FILE: ""
+      S3_SECRET_KEY_FILE: ""
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?set BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Administrator}
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-52428800}
+      UPLOAD_ALLOWED_TYPES: ${UPLOAD_ALLOWED_TYPES:-image/jpeg,image/png,image/webp,image/tiff}
+      OCR_ENGINE: ${OCR_ENGINE:-tesseract}
+      ID_PATTERN: ${ID_PATTERN}
+      PAPER_MIN_CONFIDENCE: ${PAPER_MIN_CONFIDENCE:-0.60}
+      OCR_AUTO_ACCEPT_CONFIDENCE: ${OCR_AUTO_ACCEPT_CONFIDENCE:-0.90}
+      OCR_REVIEW_CONFIDENCE: ${OCR_REVIEW_CONFIDENCE:-0.55}
+      FUZZY_AUTO_ACCEPT_RATIO: ${FUZZY_AUTO_ACCEPT_RATIO:-0.93}
+      FUZZY_REVIEW_RATIO: ${FUZZY_REVIEW_RATIO:-0.72}
+      QUALITY_MIN_SCORE: ${QUALITY_MIN_SCORE:-0.50}
+      UPSCALE_MIN_SHORT_SIDE: ${UPSCALE_MIN_SHORT_SIDE:-1600}
+      UPSCALE_MAX_FACTOR: ${UPSCALE_MAX_FACTOR:-2.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    expose:
+      - "8000"
+    # Routing: Coolify injects the Traefik labels automatically once you assign a
+    # domain to this service in the UI. See docs/DEPLOY_COOLIFY.md, section 2.
+
+  cv-worker:
+    build:
+      context: .
+      dockerfile: cv-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
+      WORKER_TMP_DIR: /tmp/wss
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    deploy:
+      replicas: ${CV_WORKER_REPLICAS:-1}
+
+  geo-worker:
+    build:
+      context: .
+      dockerfile: geo-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app_env
+      JOB_MAX_ATTEMPTS: ${JOB_MAX_ATTEMPTS:-3}
+      WORKER_TMP_DIR: /tmp/wss
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* is baked in at BUILD time.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      - api
+    expose:
+      - "3000"
+    # Routing: Coolify injects the Traefik labels automatically once you assign a
+    # domain to this service in the UI. See docs/DEPLOY_COOLIFY.md, section 2.
+
+volumes:
+  postgres_data:
+  redis_data:
+  garage_meta:
+  garage_data:

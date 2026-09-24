@@ -1,0 +1,12 @@
+opencv-python-headless>=4.9
+numpy
+Pillow
+pytesseract
+rapidfuzz
+boto3
+redis
+sqlalchemy>=2
+psycopg[binary]
+pydantic-settings
+pytest
+# paddleocr  # optional - uncomment if needed

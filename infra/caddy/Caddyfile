@@ -1,0 +1,24 @@
+{
+	admin off
+}
+
+# Browser-facing S3 endpoint.
+# Garage's built-in CORS only decorates OPTIONS with a 403, which fails the
+# browser preflight, so we terminate preflight here with a 204 and inject the
+# CORS headers on every response. Requests are proxied unchanged so the SigV4
+# signature (which covers the Host header) stays valid.
+:3900 {
+	@preflight method OPTIONS
+	respond @preflight 204
+
+	header {
+		Access-Control-Allow-Origin "*"
+		Access-Control-Allow-Methods "GET, PUT, POST, HEAD, DELETE, OPTIONS"
+		Access-Control-Allow-Headers "*"
+		Access-Control-Expose-Headers "ETag, x-amz-request-id, x-amz-version-id, x-amz-delete-marker, Content-Length"
+		Access-Control-Max-Age "3600"
+		-Server
+	}
+
+	reverse_proxy garage:3900
+}

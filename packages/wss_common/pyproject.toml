@@ -1,0 +1,20 @@
+[project]
+name = "wss-common"
+version = "0.1.0"
+description = "Shared contracts (models, enums, storage, queue, config) for the WSS Map Processing Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0.30",
+    "psycopg[binary]>=3.1.18",
+    "boto3>=1.34.0",
+    "redis>=5.0.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["wss_common*"]

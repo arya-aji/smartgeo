@@ -1,0 +1,168 @@
+name: wss
+
+# ---------------------------------------------------------------------------
+# WSS Map Processing Platform — local / single-node stack.
+#
+#   1. cp .env.example .env
+#   2. docker compose up -d --build postgres redis garage garage-cors
+#   3. pwsh scripts/bootstrap-garage.ps1   (or: sh scripts/bootstrap-garage.sh)
+#      -> creates the bucket + S3 key, writes infra/garage/credentials, then
+#         brings up api, workers and web
+#   4. open http://localhost:3000  (login: admin / admin123)
+#
+# Services: postgres, redis, garage (+caddy CORS proxy), garage-init,
+#           api, cv-worker, geo-worker, web
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wss}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wss}
+      POSTGRES_DB: ${POSTGRES_DB:-wss}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-wss} -d $${POSTGRES_DB:-wss}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  garage:
+    image: dxflrs/garage:v2.1.0
+    restart: unless-stopped
+    volumes:
+      - ./infra/garage/garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    expose:
+      - "3900"
+    ports:
+      - "3903:3903"   # admin API (debugging only)
+    healthcheck:
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  # Browser-facing S3 endpoint. Garage's built-in CORS only decorates OPTIONS
+  # with a 403, which fails the browser preflight, so Caddy terminates
+  # preflight (204 + CORS headers) and proxies requests unchanged so presigned
+  # SigV4 URLs stay valid. Do NOT add `header_up Host` here: rewriting the Host
+  # breaks the signature.
+  garage-cors:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "3900:3900"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      S3_ACCESS_KEY_FILE: /run/garage/access_key
+      S3_SECRET_KEY_FILE: /run/garage/secret_key
+    volumes:
+      - ./infra/garage/credentials:/run/garage:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  cv-worker:
+    build:
+      context: .
+      dockerfile: cv-worker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      S3_ACCESS_KEY_FILE: /run/garage/access_key
+      S3_SECRET_KEY_FILE: /run/garage/secret_key
+    volumes:
+      - ./infra/garage/credentials:/run/garage:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+
+  geo-worker:
+    build:
+      context: .
+      dockerfile: geo-worker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      S3_ACCESS_KEY_FILE: /run/garage/access_key
+      S3_SECRET_KEY_FILE: /run/garage/secret_key
+    volumes:
+      - ./infra/garage/credentials:/run/garage:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  garage_meta:
+  garage_data:
