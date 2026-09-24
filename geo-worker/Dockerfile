@@ -5,11 +5,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# GDAL is bundled in the rasterio manylinux wheels
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libglib2.0-0 \
-        libexpat1 \
-    && rm -rf /var/lib/apt/lists/*
+# No extra system runtime libs required (rasterio & Pillow bundle needed libs in manylinux wheels)
 
 WORKDIR /app
 

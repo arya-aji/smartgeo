@@ -24,6 +24,9 @@ databases, explicit `environment:` blocks, and Traefik labels.)
 
   All three are required. The Garage one is **not optional**: browsers upload
   photos directly to it, so it must be publicly reachable over HTTPS.
+- **Server memory**: If your server has ≤ 4 GB RAM, ensure swap is enabled
+  (e.g., `fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`).
+  Without swap, Docker builds can trigger the Linux kernel OOM killer (exit code 255).
 
 > Do **not** commit `.env` or `infra/garage/credentials/` — both are git-ignored.
 
@@ -97,6 +100,12 @@ Add these in Coolify's environment editor for the resource. Values marked
 | `BOOTSTRAP_ADMIN_NAME` | `Administrator` |
 | `APP_ENV` | `production` |
 | `LOG_LEVEL` | `INFO` |
+| `COMPOSE_PARALLEL_LIMIT` | `1` (prevents build OOM by building images sequentially) |
+
+> **Mark both `NEXT_PUBLIC_API_BASE_URL` and `COMPOSE_PARALLEL_LIMIT` as "Build Variables" in Coolify.**
+> Coolify gives every variable independent *Build* and *Runtime* toggles. Setting
+> `COMPOSE_PARALLEL_LIMIT=1` ensures Docker builds one service at a time, keeping
+> memory usage low.
 
 ### URLs (must match the domains from step 2)
 
