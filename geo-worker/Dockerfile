@@ -1,14 +1,13 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# GDAL is bundled in the rasterio manylinux wheels; these are runtime libs
+# GDAL is bundled in the rasterio manylinux wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-0 \
-        libgl1 \
         libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 

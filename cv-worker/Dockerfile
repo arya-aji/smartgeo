@@ -1,16 +1,15 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# tesseract for OCR; libglib/libgl for OpenCV runtime deps
+# tesseract for OCR; libglib2.0-0 for OpenCV headless utils (libgl1 is NOT needed for headless)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-eng \
         libglib2.0-0 \
-        libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
