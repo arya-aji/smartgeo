@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
-import { storeAuth } from "@/lib/auth";
+import { homePathFor, storeAuth } from "@/lib/auth";
 import { showToast } from "@/components/Toast";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +16,9 @@ export default function LoginPage() {
     try {
       const res = await login({ username, password });
       storeAuth(res.access_token, res.user);
-      router.push("/dashboard");
+      // Hard navigation so the freshly set cookies are sent and the edge
+      // middleware (not the client router cache) decides where to land.
+      window.location.href = homePathFor(res.user.role);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
       showToast(msg, "error");

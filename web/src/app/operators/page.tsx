@@ -25,7 +25,7 @@ export default function OperatorsPage() {
 
   useEffect(() => {
     if (!isAdmin()) {
-      router.push("/dashboard");
+      router.push("/maps");
       return;
     }
     fetchData();

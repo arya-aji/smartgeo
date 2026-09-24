@@ -25,6 +25,7 @@ router = APIRouter()
 def list_targets(
     status: str | None = None,
     q: str | None = None,
+    mine: bool = False,
     page: int = 1,
     page_size: int = 20,
     db: Session = Depends(get_session),
@@ -38,6 +39,11 @@ def list_targets(
         query = query.filter(WssTarget.status == status)
     if q:
         query = query.filter(WssTarget.idsubsls.ilike(f"%{q}%"))
+    if mine:
+        query = query.filter(WssTarget.assigned_to == current_user.id)
+
+    # Deterministic, region-code order (was implicit DB order).
+    query = query.order_by(WssTarget.idsubsls.asc())
 
     total = query.count()
     pages = math.ceil(total / page_size) if page_size else 1

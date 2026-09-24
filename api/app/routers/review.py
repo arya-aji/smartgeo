@@ -23,6 +23,7 @@ from app.schemas import (
     ReviewManualIdRequest,
 )
 from app.services.finalize import promote_review_output
+from app.services.urls import attach_detail_urls, attach_summary
 
 router = APIRouter()
 
@@ -37,7 +38,11 @@ def list_review(
     if page_size > 100:
         page_size = 100
 
-    query = db.query(MapDocument).filter(MapDocument.processing_status == ProcessingStatus.NEEDS_REVIEW)
+    query = (
+        db.query(MapDocument)
+        .filter(MapDocument.processing_status == ProcessingStatus.NEEDS_REVIEW)
+        .order_by(MapDocument.created_at.desc(), MapDocument.id.desc())
+    )
     total = query.count()
     pages = math.ceil(total / page_size) if page_size else 1
     items = query.offset((page - 1) * page_size).limit(page_size).all()
@@ -45,9 +50,9 @@ def list_review(
     enriched = []
     for doc in items:
         summary = MapDocumentSummary.model_validate(doc)
-        summary.uploaded_by_name = (
-            db.query(User.name).filter(User.id == doc.uploaded_by).scalar() if doc.uploaded_by else None
-        )
+        # A document awaiting review stores its output under review_object_key
+        # (preview_object_key is only populated for COMPLETED documents).
+        attach_summary(db, doc, summary, doc.review_object_key or doc.preview_object_key)
         enriched.append(summary)
 
     return {
@@ -83,11 +88,7 @@ def accept_review(
     db.commit()
     db.refresh(doc)
 
-    detail = MapDocumentDetail.model_validate(doc)
-    detail.uploaded_by_name = (
-        db.query(User.name).filter(User.id == doc.uploaded_by).scalar() if doc.uploaded_by else None
-    )
-    return detail
+    return attach_detail_urls(db, doc, MapDocumentDetail.model_validate(doc))
 
 
 @router.post("/{doc_id}/manual-id", response_model=MapDocumentDetail)
@@ -111,8 +112,4 @@ def manual_id_review(
     db.commit()
     db.refresh(doc)
 
-    detail = MapDocumentDetail.model_validate(doc)
-    detail.uploaded_by_name = (
-        db.query(User.name).filter(User.id == doc.uploaded_by).scalar() if doc.uploaded_by else None
-    )
-    return detail
+    return attach_detail_urls(db, doc, MapDocumentDetail.model_validate(doc))

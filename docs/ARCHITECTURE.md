@@ -162,3 +162,19 @@ See `docs/DEPLOY_COOLIFY.md`.
 lengths. Per-document metrics (`paper_confidence`, `ocr_confidence`,
 `quality_score`, `processing_attempts`, `error_message`) are persisted for
 bottleneck analysis after the first 100–300 photos.
+
+## 13. UI coverage (current)
+
+The web UI covers the CV stage end to end: claim a batch of regions (**Tasks**),
+upload (**Upload**, with live processing status), inspect activity (**Logs**),
+resolve exceptions (**Review**), and see the resulting map per region (**Map**,
+with preview/download). Admins additionally get **Dashboard**, **Operators** and
+**Targets**.
+
+These endpoints exist but are **not** wired into the UI yet:
+
+- `POST/GET /geojson/*` and `POST/GET /georeference/*` — the geo-worker stage 2
+  (GeoJSON matching, georeferencing, GeoTIFF/COG output). API-only.
+- `POST /jobs` and `GET /jobs/{job_id}` — job creation/inspection; the UI only
+  uses `POST /jobs/{job_id}/retry` (Logs detail page).
+

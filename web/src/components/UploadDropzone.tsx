@@ -52,7 +52,7 @@ export default function UploadDropzone({ onUpload, disabled }: UploadDropzonePro
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors ${
+      className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors ${
         dragOver
           ? "border-surface-800 bg-surface-100"
           : "border-surface-300 bg-white hover:border-surface-500"

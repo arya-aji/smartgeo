@@ -199,6 +199,11 @@ export interface ImportTargetsResponse {
   invalid: number;
 }
 
+export interface BatchClaimResponse {
+  targets: WssTarget[];
+  remaining: number;
+}
+
 export interface ReviewAcceptRequest {
   idsubsls?: string;
 }

@@ -228,6 +228,14 @@ curl https://api.maps.example.com/api/health
    the map to the region by `idsubsls`).
 6. Check **Dashboard** for totals and progress.
 
+> The UI is **Map** (all regions + result), **Logs** (every document, newest
+> first), **Review** (exceptions), **Tasks** (claim a batch of regions) and
+> **Upload**. Dashboard, Operators and Targets are admin-only.
+>
+> After upgrading an existing deployment, **log out and back in once**: the
+> navigation and the admin-only gate now read a `role` cookie that sessions
+> created before this change do not have (an admin without it lands on Map).
+
 If the browser upload fails, see *Troubleshooting*.
 
 ---

@@ -79,7 +79,12 @@ export default function MapsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-surface-900">Logs</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-surface-900">Logs</h1>
+          <p className="mt-1 text-sm text-surface-500">
+            Every uploaded document and its processing state (newest first).
+          </p>
+        </div>
         <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
           <select
             value={status}

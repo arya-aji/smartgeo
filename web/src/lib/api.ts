@@ -17,9 +17,11 @@ import type {
   WssTarget,
   ImportTargetsRequest,
   ImportTargetsResponse,
+  BatchClaimResponse,
   ReviewAcceptRequest,
   ReviewManualRequest,
 } from "./types";
+import { clearAuth } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -44,6 +46,14 @@ async function fetchJson<T>(
 
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
+    // Expired/invalid session: drop it and bounce to the login page. The login
+    // call itself is exempt so a wrong password only shows a toast.
+    if (res.status === 401 && !path.startsWith("/api/auth/login")) {
+      clearAuth();
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
@@ -148,15 +158,24 @@ export async function updateOperator(id: string, payload: UpdateOperatorRequest)
 export async function getTargets(params: {
   status?: string;
   q?: string;
+  mine?: boolean;
   page?: number;
   page_size?: number;
 }): Promise<PaginationEnvelope<WssTarget>> {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
+  if (params.mine) sp.set("mine", "true");
   if (params.page) sp.set("page", String(params.page));
   if (params.page_size) sp.set("page_size", String(params.page_size));
   return fetchJson<PaginationEnvelope<WssTarget>>(`/api/targets?${sp.toString()}`);
+}
+
+export async function claimBatch(size: number): Promise<BatchClaimResponse> {
+  return fetchJson<BatchClaimResponse>("/api/batches/claim", {
+    method: "POST",
+    body: JSON.stringify({ size }),
+  });
 }
 
 export async function importTargets(payload: ImportTargetsRequest): Promise<ImportTargetsResponse> {

@@ -15,6 +15,7 @@ export default function ReviewPage() {
   const [pages, setPages] = useState(1);
   const [manualId, setManualId] = useState<Record<string, string>>({});
   const [acting, setActing] = useState<Record<string, boolean>>({});
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const fetchData = async (p = page) => {
     setLoading(true);
@@ -36,7 +37,15 @@ export default function ReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  const handleAccept = async (id: string) => {
+  const handleAccept = async (item: MapDocumentSummary) => {
+    if (
+      !confirm(
+        `Accept this result as the final map for ${item.idsubsls ?? "this ID"}?\n\nIt becomes the region's final map and cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    const id = item.id;
     setActing((prev) => ({ ...prev, [id]: true }));
     try {
       await acceptReview(id);
@@ -50,7 +59,8 @@ export default function ReviewPage() {
     }
   };
 
-  const handleManual = async (id: string) => {
+  const handleManual = async (item: MapDocumentSummary) => {
+    const id = item.id;
     const idsubsls = manualId[id]?.trim();
     if (!idsubsls) {
       showToast("Enter an IDSUBSLS", "error");
@@ -58,6 +68,13 @@ export default function ReviewPage() {
     }
     if (!/^\d{16}$/.test(idsubsls)) {
       showToast("IDSUBSLS must be exactly 16 digits", "error");
+      return;
+    }
+    if (
+      !confirm(
+        `Apply ${idsubsls} as the final ID?\n\nIt becomes the region's final map and cannot be undone.`
+      )
+    ) {
       return;
     }
     setActing((prev) => ({ ...prev, [id]: true }));
@@ -99,15 +116,23 @@ export default function ReviewPage() {
               className="flex flex-col gap-4 rounded-lg border border-surface-200 bg-white p-4 shadow-sm sm:flex-row"
             >
               <div className="shrink-0">
-                {item.preview_url ? (
-                  <img
-                    src={item.preview_url}
-                    alt=""
-                    className="h-32 w-32 rounded object-cover"
-                  />
-                ) : (
-                  <div className="h-32 w-32 rounded bg-surface-200" />
-                )}
+                <button
+                  type="button"
+                  aria-label="Enlarge preview"
+                  onClick={() => item.preview_url && setPreviewUrl(item.preview_url)}
+                  title={item.preview_url ? "Click to enlarge" : undefined}
+                  className={item.preview_url ? "cursor-zoom-in" : "cursor-default"}
+                >
+                  {item.preview_url ? (
+                    <img
+                      src={item.preview_url}
+                      alt=""
+                      className="h-32 w-32 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="h-32 w-32 rounded bg-surface-200" />
+                  )}
+                </button>
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
@@ -120,8 +145,8 @@ export default function ReviewPage() {
                   <p className="text-sm text-rose-700">{item.review_reason}</p>
                 )}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={() => handleAccept(item.id)}
+                    <button
+                      onClick={() => handleAccept(item)}
                     disabled={acting[item.id]}
                     className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
                   >
@@ -138,7 +163,7 @@ export default function ReviewPage() {
                       className="w-40 rounded-md border border-surface-300 px-2 py-1.5 text-sm font-mono focus:border-surface-500 focus:outline-none focus:ring-1 focus:ring-surface-500"
                     />
                     <button
-                      onClick={() => handleManual(item.id)}
+                      onClick={() => handleManual(item)}
                       disabled={acting[item.id]}
                       className="rounded-md bg-surface-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-surface-800 disabled:opacity-50"
                     >
@@ -173,6 +198,27 @@ export default function ReviewPage() {
           </button>
         </div>
       </div>
+
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewUrl(null)}
+            className="absolute right-4 top-4 rounded-md bg-white/90 px-3 py-1 text-sm font-medium text-surface-900 hover:bg-white"
+          >
+            Close
+          </button>
+          <img
+            src={previewUrl}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-full rounded-lg bg-white object-contain"
+          />
+        </div>
+      )}
     </div>
   );
 }

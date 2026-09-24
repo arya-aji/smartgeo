@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getDashboard } from "@/lib/api";
+import { isAdmin } from "@/lib/auth";
 import type { DashboardResponse } from "@/lib/types";
 import StatCard from "@/components/StatCard";
 import ProgressBar from "@/components/ProgressBar";
@@ -9,6 +11,7 @@ import DataTable from "@/components/DataTable";
 import { showToast } from "@/components/Toast";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,9 +28,14 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    if (!isAdmin()) {
+      router.push("/maps");
+      return;
+    }
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading && !data) {
@@ -70,7 +78,7 @@ export default function DashboardPage() {
       <div className="rounded-lg border border-surface-200 bg-white p-4 shadow-sm">
         <ProgressBar
           percent={data.progress_percent}
-          target={5511}
+          target={g.total}
           current={g.completed}
         />
       </div>

@@ -168,8 +168,15 @@ Request: any of `{ "name", "password", "is_active", "role" }` → `User`
 ## Targets (master IDSUBSLS list)
 
 ### GET `/api/targets`
-Query: `status`, `q`, `page`, `page_size` → pagination envelope of
-`{ id, idsubsls, status, map_document_id, assigned_to, assigned_at }`
+Query: `status`, `q`, `mine` (`true` → only targets assigned to the current
+user), `page`, `page_size` → pagination envelope of
+`{ id, idsubsls, status, map_document_id, assigned_to, assigned_at,
+preview_url, final_url, download_url }`
+
+`preview_url`, `final_url` and `download_url` are presigned GET URLs for the
+region's resulting map — `null` until the region has a completed document.
+`download_url` forces a download via `Content-Disposition: attachment`.
+Ordered by `idsubsls` ascending.
 
 ### POST `/api/targets/import`
 Request: `{ "idsubsls": ["3173030005003200", "3173030005003201"] }`

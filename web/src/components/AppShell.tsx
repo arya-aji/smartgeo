@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getUser, clearAuth, isAdmin } from "@/lib/auth";
+import { me } from "@/lib/api";
+import { clearAuth, getToken, getUser, isAdmin, storeUser } from "@/lib/auth";
 import type { User } from "@/lib/types";
 
 const NAV = [
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Tasks", href: "/tasks" },
   { label: "Upload", href: "/upload" },
   { label: "Map", href: "/maps" },
   { label: "Logs", href: "/logs" },
   { label: "Review", href: "/review" },
 ];
 
+// Dashboard is admin-only (its API requires an admin); operators land on /maps.
 const ADMIN_NAV = [
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Operators", href: "/operators" },
   { label: "Targets", href: "/targets" },
 ];
@@ -26,6 +29,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setUser(getUser());
+    // Re-validate the session and refresh the cached role on load. A 401 is
+    // handled globally by the API client, so there is nothing to do here.
+    if (!getToken()) return;
+    me()
+      .then((fresh) => {
+        storeUser(fresh);
+        setUser(fresh);
+      })
+      .catch(() => {
+        /* handled by the API client */
+      });
   }, []);
 
   const handleLogout = () => {
