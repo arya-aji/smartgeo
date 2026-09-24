@@ -42,17 +42,33 @@ services:
       retries: 12
 
   garage:
-    image: dxflrs/garage:v2.1.0
+    image: dxflrs/garage:v2.3.0
     restart: unless-stopped
+    # Garage >= v2.3.0 can bootstrap itself from the environment: --single-node
+    # configures the cluster layout, --default-bucket implies --default-access-key
+    # and creates the bucket + access key from GARAGE_DEFAULT_*. The key reuses
+    # the API's S3 credentials so the signature the API signs always matches the
+    # key Garage created — no manual `garage` CLI step (see DEPLOY_COOLIFY.md §5).
+    command:
+      - /garage
+      - -c
+      - /etc/garage.toml
+      - server
+      - --single-node
+      - --default-access-key
+      - --default-bucket
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+      GARAGE_DEFAULT_BUCKET: ${S3_BUCKET:-wss}
     volumes:
       - ./infra/garage/garage.toml:/etc/garage.toml:ro
       - garage_meta:/var/lib/garage/meta
       - garage_data:/var/lib/garage/data
     expose:
       - "3900"
-    # No healthcheck: 'garage status' always fails on fresh deployment before
-    # the cluster layout is bootstrapped (see docs/DEPLOY_COOLIFY.md step 5).
-    # Dependent services use condition: service_started so they don't block.
+    # No healthcheck: dependent services use condition: service_started so a
+    # cold start is not blocked while Garage initialises its metadata store.
 
   # Browser-facing S3 endpoint. Garage's built-in CORS only decorates OPTIONS
   # with a 403 (which fails the browser preflight), so Caddy terminates the

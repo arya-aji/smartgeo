@@ -127,8 +127,8 @@ Add these in Coolify's environment editor for the resource. Values marked
 |---|---|
 | `S3_REGION` | `garage` |
 | `S3_BUCKET` | `wss` |
-| `S3_ACCESS_KEY` | leave empty for now (filled in step 5) |
-| `S3_SECRET_KEY` | leave empty for now (filled in step 5) |
+| `S3_ACCESS_KEY` | **required** — `GK` + `openssl rand -hex 16` |
+| `S3_SECRET_KEY` | **required** — `openssl rand -hex 32` |
 
 ### Processing thresholds (defaults are fine; tune after benchmark)
 
@@ -161,71 +161,57 @@ Check:
 - `web` → `https://maps.example.com` should return the login page.
 - `api` → `https://api.maps.example.com/api/health` should return
   `{"status":"ok","db":true,"redis":true,"storage":...}`.
-  `storage` may be `false` until step 5 — that is expected.
+  `storage` should be `true`; it stays `false` only when `S3_ACCESS_KEY` /
+  `S3_SECRET_KEY` were not set (see step 5).
 
 ---
 
-## 5. Bootstrap Garage (one time, required)
+## 5. Garage credentials (automatic — no shell access needed)
 
-The official Garage image is **distroless (no shell)**, so the Garage CLI must be
-run *inside* the running container. Note that Coolify's interactive **Terminal**
-opens a shell, which this image does not have — so use one of these instead:
+Garage bootstraps itself from the environment, so there is **no manual `garage`
+CLI step and no server shell access required**. `docker-compose.coolify.yml`
+starts Garage with `server --single-node --default-access-key --default-bucket`,
+which on first start:
 
-**Option A — server SSH (most reliable):**
+1. configures the single-node cluster layout,
+2. creates the S3 access key from `S3_ACCESS_KEY` / `S3_SECRET_KEY`,
+3. creates the bucket `S3_BUCKET` (default `wss`) and grants that key full access.
 
-```bash
-CID=$(docker ps -qf "name=garage" | head -n1)
-docker exec -it "$CID" /garage -c /etc/garage.toml node id
-```
-Copy the node id (the part before `@`), then run each of these (same `docker
-exec` form, replacing `<NODE_ID>`):
-
-```sh
-/garage -c /etc/garage.toml layout assign -z dc1 -c 100G <NODE_ID>
-/garage -c /etc/garage.toml layout apply --version 1
-/garage -c /etc/garage.toml bucket create wss
-/garage -c /etc/garage.toml key create wss-app
-/garage -c /etc/garage.toml bucket allow --read --write --owner wss --key wss-app
-/garage -c /etc/garage.toml key info --show-secret wss-app
-```
-
-**Option B — Coolify UI:** if your Coolify version offers an "Execute Command"
-that runs a single command without a shell, use it with the commands above
-(prefixed by `/garage`). If it only opens a shell, use Option A.
-
-Notes:
-
-- Capacity must be at least `1K` (use `100G` above). `-c 1` fails with
-  *"Capacity should be at least 1K"*, after which everything else fails with
-  *"Layout not ready"*.
-- `layout apply --version 1` only works the first time. If it errors, the layout
-  is already applied — continue.
-
-The last command prints:
-
-```
-Key ID:         GK........
-Secret key:     ................................
-```
-
-Set both in Coolify:
+All you have to do is set the credentials in Coolify (**Environment Variables**)
+and redeploy. The key Garage creates always matches what the API signs with,
+because both read the same variables:
 
 | Variable | Value |
 |---|---|
-| `S3_ACCESS_KEY` | the *Key ID* |
-| `S3_SECRET_KEY` | the *Secret key* |
+| `S3_ACCESS_KEY` | **required** — access key id, e.g. `GK` + 16 random hex chars |
+| `S3_SECRET_KEY` | **required** — 32 random bytes, hex encoded |
+| `S3_BUCKET` | `wss` |
+| `S3_PUBLIC_ENDPOINT` | `https://garage.maps.example.com` |
 
-Then **Redeploy** (a plain restart is enough — no rebuild needed) so the API and
-workers pick up the credentials. Re-check:
+Generate the values locally:
+
+```sh
+echo "GK$(openssl rand -hex 16)"   # S3_ACCESS_KEY
+openssl rand -hex 32               # S3_SECRET_KEY
+```
+
+The compose fails fast (with `set S3_ACCESS_KEY`) if they are missing. After the
+deploy, re-check:
 
 ```sh
 curl https://api.maps.example.com/api/health
 ```
 `"storage": true` means the whole stack is wired up.
 
-> Alternative if you have server shell access: `scripts/bootstrap-garage.sh`
-> performs the same sequence via `docker compose exec` (also works with the local
-> `docker-compose.yml` for staging).
+> Requires Garage **>= v2.3.0** (the compose pins `dxflrs/garage:v2.3.0`). The
+> flags are safe to leave in place on restarts — Garage only refuses
+> `--single-node` if the cluster already contains *other* nodes. If you
+> previously bootstrapped Garage by hand, set `S3_ACCESS_KEY` / `S3_SECRET_KEY`
+> to the credentials printed back then, or delete the `garage_meta` /
+> `garage_data` volumes to start fresh.
+>
+> With server shell access the equivalent can still be run by hand:
+> `scripts/bootstrap-garage.sh` (also used by the local `docker-compose.yml`).
 
 ---
 
