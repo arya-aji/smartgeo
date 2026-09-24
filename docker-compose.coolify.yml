@@ -50,11 +50,9 @@ services:
       - garage_data:/var/lib/garage/data
     expose:
       - "3900"
-    healthcheck:
-      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
-      interval: 5s
-      timeout: 5s
-      retries: 24
+    # No healthcheck: 'garage status' always fails on fresh deployment before
+    # the cluster layout is bootstrapped (see docs/DEPLOY_COOLIFY.md step 5).
+    # Dependent services use condition: service_started so they don't block.
 
   # Browser-facing S3 endpoint. Garage's built-in CORS only decorates OPTIONS
   # with a 403 (which fails the browser preflight), so Caddy terminates the
@@ -65,7 +63,7 @@ services:
     restart: unless-stopped
     depends_on:
       garage:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     expose:
@@ -119,7 +117,7 @@ services:
       redis:
         condition: service_healthy
       garage:
-        condition: service_healthy
+        condition: service_started
     expose:
       - "8000"
     # Routing: Coolify injects the Traefik labels automatically once you assign a
@@ -141,7 +139,7 @@ services:
       redis:
         condition: service_healthy
       garage:
-        condition: service_healthy
+        condition: service_started
     deploy:
       replicas: ${CV_WORKER_REPLICAS:-1}
 
@@ -160,7 +158,7 @@ services:
       redis:
         condition: service_healthy
       garage:
-        condition: service_healthy
+        condition: service_started
 
   web:
     build:
