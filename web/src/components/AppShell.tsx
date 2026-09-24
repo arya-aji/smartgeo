@@ -9,7 +9,8 @@ import type { User } from "@/lib/types";
 const NAV = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Upload", href: "/upload" },
-  { label: "Maps", href: "/maps" },
+  { label: "Map", href: "/maps" },
+  { label: "Logs", href: "/logs" },
   { label: "Review", href: "/review" },
 ];
 

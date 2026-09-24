@@ -51,7 +51,7 @@ export interface OcrCandidate {
 
 export interface MapDocumentDetail extends MapDocumentSummary {
   ocr_raw: string | null;
-  ocr_candidates: OcrCandidate[];
+  ocr_candidates: OcrCandidate[] | null;
   corners: Record<string, unknown> | null;
   source_width: number | null;
   source_height: number | null;
@@ -184,6 +184,9 @@ export interface WssTarget {
   map_document_id: string | null;
   assigned_to: string | null;
   assigned_at: string | null;
+  preview_url: string | null;
+  final_url: string | null;
+  download_url: string | null;
 }
 
 export interface ImportTargetsRequest {

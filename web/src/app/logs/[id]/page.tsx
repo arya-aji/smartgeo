@@ -68,16 +68,17 @@ export default function MapDetailPage() {
   }
 
   const imageUrl = doc.final_url || doc.review_url || doc.original_url || doc.preview_url;
+  const ocrCandidates = doc.ocr_candidates ?? [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <button
-            onClick={() => router.push("/maps")}
+            onClick={() => router.push("/logs")}
             className="text-sm text-surface-500 hover:text-surface-900"
           >
-            ← Back to Maps
+            ← Back to Logs
           </button>
           <h1 className="mt-1 text-xl font-semibold text-surface-900">{doc.idsubsls}</h1>
         </div>
@@ -168,11 +169,11 @@ export default function MapDetailPage() {
               <span className="text-surface-500">Raw:</span>{" "}
               <span className="font-mono font-medium text-surface-900">{doc.ocr_raw ?? "—"}</span>
             </div>
-            {doc.ocr_candidates.length > 0 && (
+            {ocrCandidates.length > 0 && (
               <div>
                 <span className="text-surface-500">Candidates:</span>
                 <ul className="mt-1 space-y-1">
-                  {doc.ocr_candidates.map((c, i) => (
+                  {ocrCandidates.map((c, i) => (
                     <li key={i} className="font-mono text-surface-700">
                       {c.idsubsls} ({formatPercent(c.confidence)})
                     </li>

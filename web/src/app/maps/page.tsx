@@ -1,59 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { getMaps } from "@/lib/api";
-import type { MapDocumentSummary, ProcessingStatus } from "@/lib/types";
+import { getTargets } from "@/lib/api";
+import type { WssTarget } from "@/lib/types";
 import DataTable from "@/components/DataTable";
 import StatusPill from "@/components/StatusPill";
-import { formatDate, formatPercent } from "@/lib/format";
 import { showToast } from "@/components/Toast";
 
-const STATUS_OPTIONS: ProcessingStatus[] = [
-  "UPLOADING",
-  "UPLOADED",
-  "QUEUED",
-  "DETECTING_PAPER",
-  "CORRECTING_PERSPECTIVE",
-  "DETECTING_ORIENTATION",
-  "ENHANCING",
-  "UPSCALING",
-  "DETECTING_TEXT",
-  "RECOGNIZING_ID",
-  "VALIDATING_ID",
-  "FINALIZING",
+const STATUS_OPTIONS = [
+  "PENDING",
+  "ASSIGNED",
+  "PROCESSING",
   "COMPLETED",
   "NEEDS_REVIEW",
   "FAILED",
 ];
 
-export default function MapsPage() {
-  const [rows, setRows] = useState<MapDocumentSummary[]>([]);
+const ACTION_BUTTON =
+  "rounded-md border border-surface-300 px-2.5 py-1 text-xs font-medium hover:bg-surface-50";
+const ACTION_DISABLED =
+  "rounded-md border border-surface-200 px-2.5 py-1 text-xs font-medium text-surface-400";
+
+export default function MapPage() {
+  const [rows, setRows] = useState<WssTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
-  const [status, setStatus] = useState<ProcessingStatus | "">("");
+  const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
-  const [mine, setMine] = useState(false);
-  const router = useRouter();
 
   const fetchData = async (p = page) => {
     setLoading(true);
     try {
-      const res = await getMaps({
+      const res = await getTargets({
         status: status || undefined,
         q: q || undefined,
         page: p,
         page_size: pageSize,
-        mine,
       });
       setRows(res.items);
       setTotal(res.total);
       setPages(res.pages);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to load maps";
+      const msg = err instanceof Error ? err.message : "Failed to load regions";
       showToast(msg, "error");
     } finally {
       setLoading(false);
@@ -63,7 +54,7 @@ export default function MapsPage() {
   useEffect(() => {
     fetchData(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, mine]);
+  }, [status]);
 
   useEffect(() => {
     fetchData(page);
@@ -79,12 +70,12 @@ export default function MapsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold text-surface-900">Logs</h1>
+        <h1 className="text-xl font-semibold text-surface-900">Map</h1>
         <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
           <select
             value={status}
             onChange={(e) => {
-              setStatus(e.target.value as ProcessingStatus | "");
+              setStatus(e.target.value);
               setPage(1);
             }}
             className="rounded-md border border-surface-300 px-2 py-1.5 text-sm focus:border-surface-500 focus:outline-none focus:ring-1 focus:ring-surface-500"
@@ -103,18 +94,6 @@ export default function MapsPage() {
             onChange={(e) => setQ(e.target.value)}
             className="rounded-md border border-surface-300 px-3 py-1.5 text-sm focus:border-surface-500 focus:outline-none focus:ring-1 focus:ring-surface-500"
           />
-          <label className="flex items-center gap-2 text-sm text-surface-700">
-            <input
-              type="checkbox"
-              checked={mine}
-              onChange={(e) => {
-                setMine(e.target.checked);
-                setPage(1);
-              }}
-              className="rounded border-surface-300 text-surface-900 focus:ring-surface-500"
-            />
-            Mine only
-          </label>
           <button
             type="submit"
             className="rounded-md bg-surface-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-surface-800"
@@ -144,38 +123,43 @@ export default function MapsPage() {
           {
             key: "status",
             header: "Status",
-            render: (row) => <StatusPill status={row.processing_status} />,
+            render: (row) => <StatusPill status={row.status} />,
           },
           {
-            key: "quality",
-            header: "Quality",
-            render: (row) => formatPercent(row.quality_score),
-            className: "text-right",
-          },
-          {
-            key: "ocr",
-            header: "OCR",
-            render: (row) => formatPercent(row.ocr_confidence),
-            className: "text-right",
-          },
-          {
-            key: "paper",
-            header: "Paper",
-            render: (row) => formatPercent(row.paper_confidence),
-            className: "text-right",
-          },
-          { key: "uploaded_by_name", header: "Uploaded by" },
-          {
-            key: "created_at",
-            header: "Created",
-            render: (row) => formatDate(row.created_at),
+            key: "actions",
+            header: "Actions",
+            render: (row) => {
+              const previewHref = row.final_url || row.preview_url;
+              return (
+                <div className="flex gap-2">
+                  {previewHref ? (
+                    <a
+                      href={previewHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={ACTION_BUTTON}
+                    >
+                      Preview
+                    </a>
+                  ) : (
+                    <span className={ACTION_DISABLED}>Preview</span>
+                  )}
+                  {row.download_url ? (
+                    <a href={row.download_url} className={ACTION_BUTTON}>
+                      Download
+                    </a>
+                  ) : (
+                    <span className={ACTION_DISABLED}>Download</span>
+                  )}
+                </div>
+              );
+            },
           },
         ]}
         rows={rows}
         keyExtractor={(r) => r.id}
-        onRowClick={(row) => router.push(`/logs/${row.id}`)}
         loading={loading}
-        emptyText="No maps found"
+        emptyText="No regions found"
       />
 
       <div className="flex items-center justify-between text-sm text-surface-600">

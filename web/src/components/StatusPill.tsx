@@ -1,6 +1,4 @@
-import type { ProcessingStatus } from "@/lib/types";
-
-const STATUS_STYLES: Record<ProcessingStatus, string> = {
+const STATUS_STYLES: Record<string, string> = {
   UPLOADING: "bg-sky-50 text-sky-700 ring-sky-600/20",
   UPLOADED: "bg-sky-50 text-sky-700 ring-sky-600/20",
   QUEUED: "bg-amber-50 text-amber-700 ring-amber-600/20",
@@ -16,10 +14,14 @@ const STATUS_STYLES: Record<ProcessingStatus, string> = {
   COMPLETED: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
   NEEDS_REVIEW: "bg-rose-50 text-rose-700 ring-rose-600/20",
   FAILED: "bg-red-50 text-red-700 ring-red-600/20",
+  // TargetStatus-only values (wss_targets)
+  PENDING: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  ASSIGNED: "bg-sky-50 text-sky-700 ring-sky-600/20",
+  PROCESSING: "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
 };
 
 interface StatusPillProps {
-  status: ProcessingStatus;
+  status: string;
 }
 
 export default function StatusPill({ status }: StatusPillProps) {

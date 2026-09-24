@@ -126,11 +126,23 @@ def presign_put(
     )
 
 
-def presign_get(key: str, expires_in: int | None = None) -> str:
-    """Presigned GET URL for previews/downloads in the UI."""
+def presign_get(
+    key: str,
+    expires_in: int | None = None,
+    disposition: str | None = None,
+) -> str:
+    """Presigned GET URL for previews/downloads in the UI.
+
+    When ``disposition`` is set (e.g. ``attachment; filename="x.jpg"``) it is
+    signed into the URL so Garage returns that ``Content-Disposition`` and the
+    browser downloads the object instead of rendering it inline.
+    """
+    params: dict[str, Any] = {"Bucket": settings.s3_bucket, "Key": key}
+    if disposition:
+        params["ResponseContentDisposition"] = disposition
     return get_s3_presign_client().generate_presigned_url(
         "get_object",
-        Params={"Bucket": settings.s3_bucket, "Key": key},
+        Params=params,
         ExpiresIn=expires_in or settings.s3_presign_expire,
     )
 

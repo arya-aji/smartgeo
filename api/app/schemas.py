@@ -220,6 +220,11 @@ class WssTargetResponse(BaseModel):
     map_document_id: uuid.UUID | None
     assigned_to: uuid.UUID | None
     assigned_at: datetime | None
+    # Presigned URLs for the resulting map, filled in by the router when the
+    # target already has a completed map_document.
+    preview_url: str | None = None
+    final_url: str | None = None
+    download_url: str | None = None
 
 
 class PaginatedTargets(BaseModel):

@@ -9,10 +9,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from wss_common import storage
 from wss_common.config import settings
 from wss_common.db import get_session
 from wss_common.enums import TargetStatus
-from wss_common.models import User, WssTarget
+from wss_common.models import MapDocument, User, WssTarget
 
 from app.core.deps import get_current_user, require_admin
 from app.schemas import PaginatedTargets, TargetImportRequest, TargetImportResponse, WssTargetResponse
@@ -42,8 +43,40 @@ def list_targets(
     pages = math.ceil(total / page_size) if page_size else 1
     items = query.offset((page - 1) * page_size).limit(page_size).all()
 
+    # Fetch the linked map documents in one query, then attach presigned URLs so
+    # the Map view can preview/download the resulting map per region.
+    doc_ids = [t.map_document_id for t in items if t.map_document_id]
+    docs: dict = {}
+    if doc_ids:
+        for doc in db.query(MapDocument).filter(MapDocument.id.in_(doc_ids)).all():
+            docs[doc.id] = doc
+
+    enriched = []
+    for target in items:
+        item = WssTargetResponse.model_validate(target)
+        doc = docs.get(target.map_document_id) if target.map_document_id else None
+        if doc is not None:
+            if doc.preview_object_key:
+                try:
+                    item.preview_url = storage.presign_get(doc.preview_object_key)
+                except Exception:
+                    item.preview_url = None
+            if doc.final_object_key:
+                try:
+                    item.final_url = storage.presign_get(doc.final_object_key)
+                except Exception:
+                    item.final_url = None
+                try:
+                    item.download_url = storage.presign_get(
+                        doc.final_object_key,
+                        disposition=f'attachment; filename="{target.idsubsls}.jpg"',
+                    )
+                except Exception:
+                    item.download_url = None
+        enriched.append(item)
+
     return {
-        "items": items,
+        "items": enriched,
         "total": total,
         "page": page,
         "page_size": page_size,
